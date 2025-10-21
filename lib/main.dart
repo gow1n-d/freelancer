@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'services/auth_provider.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/customer/customer_dashboard_screen.dart';
+import 'screens/freelancer/freelancer_dashboard_screen.dart';
 import 'utils/constants.dart';
 import 'utils/theme.dart';
 
@@ -7,8 +12,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  // Note: firebase_options.dart will be generated after Firebase setup
-  // For now, this is a placeholder
+  // Note: Uncomment after running `flutterfire configure`
   // await Firebase.initializeApp(
   //   options: DefaultFirebaseOptions.currentPlatform,
   // );
@@ -21,16 +25,55 @@ class ServiceBookingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: MaterialApp(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const AuthWrapper(),
+      ),
     );
   }
 }
 
-/// Temporary splash screen - will be replaced with proper authentication flow
+/// Wrapper to handle authentication state and navigation
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // Show loading screen while checking auth state
+        if (authProvider.isLoading) {
+          return const SplashScreen();
+        }
+
+        // User not signed in - show login screen
+        if (!authProvider.isSignedIn) {
+          return const LoginScreen();
+        }
+
+        // User signed in but no user data - show loading
+        if (authProvider.currentUser == null) {
+          return const SplashScreen();
+        }
+
+        // Navigate to appropriate dashboard based on role
+        if (authProvider.isFreelancer) {
+          return const FreelancerDashboardScreen();
+        } else {
+          return const CustomerDashboardScreen();
+        }
+      },
+    );
+  }
+}
+
+/// Splash screen shown during initialization and loading
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -56,7 +99,8 @@ class SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Phase 1: Project Setup Complete',
+              'Connect with local service providers',
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
