@@ -422,42 +422,153 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_subscription == null) {
-      return ElevatedButton(
-        onPressed: _navigateToSubscription,
-        child: const Text('Subscribe'),
+    // No subscription or inactive
+    if (_subscription == null || !_subscription!.hasSubscription) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryLight.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.card_membership_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Subscribe to Get Bookings',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Activate your subscription to appear in customer searches and start receiving booking requests',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _navigateToSubscription,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('View Plans'),
+            ),
+          ],
+        ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _subscription!.plan.name,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+    // Has active subscription
+    final statusColor = _subscription!.isActive
+        ? AppTheme.successColor
+        : _subscription!.status == AppConstants.subscriptionCancelled
+            ? AppTheme.warningColor
+            : AppTheme.errorColor;
+
+    final daysRemaining = _subscription!.daysRemaining;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _subscription!.isActive
+                        ? Icons.check_circle_rounded
+                        : Icons.info_rounded,
+                    color: statusColor,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _subscriptionService.formatStatus(_subscription!.status),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                  ),
+                ],
               ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _subscription!.plan.description,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _subscriptionService.formatPlan(_subscription!.plan),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Expires on ${_subscription!.endDate}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _navigateToSubscriptionManagement,
-          child: const Text('Manage Subscription'),
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Days remaining (if active)
+          if (daysRemaining != null && daysRemaining > 0) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.timer_rounded,
+                  size: 18,
+                  color: AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$daysRemaining days remaining',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textPrimary,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Manage button
+          ElevatedButton(
+            onPressed: _navigateToSubscriptionManagement,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            child: const Text('Manage Subscription'),
+          ),
+        ],
+      ),
     );
   }
 }
