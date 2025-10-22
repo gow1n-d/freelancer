@@ -3,11 +3,16 @@ import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_provider.dart';
 import '../../services/profile_service.dart';
+import '../../services/subscription_service.dart';
+import '../../models/subscription_model.dart';
 import '../../utils/theme.dart';
 import '../../models/user_model.dart';
+import '../../utils/constants.dart';
 import '../auth/login_screen.dart';
 import 'profile_edit_screen.dart';
 import 'profile_preview_screen.dart';
+import 'subscription_screen.dart';
+import 'subscription_management_screen.dart';
 
 /// Freelancer dashboard screen with profile management
 class FreelancerDashboardScreen extends StatefulWidget {
@@ -21,6 +26,43 @@ class FreelancerDashboardScreen extends StatefulWidget {
 class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
   final _authService = AuthService();
   final _profileService = ProfileService();
+  final _subscriptionService = SubscriptionService();
+  
+  SubscriptionModel? _subscription;
+  bool _isLoadingSubscription = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionData();
+  }
+
+  Future<void> _loadSubscriptionData() async {
+    setState(() {
+      _isLoadingSubscription = true;
+    });
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.firebaseUser?.uid;
+
+      if (userId != null) {
+        final subscription = await _subscriptionService.getSubscription(userId);
+        setState(() {
+          _subscription = subscription;
+          _isLoadingSubscription = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingSubscription = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingSubscription = false;
+      });
+    }
+  }
 
   Future<void> _handleSignOut() async {
     final confirmed = await showDialog<bool>(
@@ -74,6 +116,32 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
         builder: (context) => ProfilePreviewScreen(user: user),
       ),
     );
+  }
+
+  Future<void> _navigateToSubscription() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SubscriptionScreen(),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadSubscriptionData();
+    }
+  }
+
+  Future<void> _navigateToSubscriptionManagement() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SubscriptionManagementScreen(),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadSubscriptionData();
+    }
   }
 
   @override
@@ -301,6 +369,19 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
 
                 const SizedBox(height: 24),
 
+                // Subscription section
+                if (!_isLoadingSubscription) ...[
+                  Text(
+                    'Subscription',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSubscriptionCard(),
+                  const SizedBox(height: 24),
+                ],
+
                 // Coming soon features
                 Text(
                   'Coming Next',
@@ -310,13 +391,6 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                _FeatureCard(
-                  icon: Icons.payment_rounded,
-                  title: 'Subscribe',
-                  phase: 'Phase 3 Week 2',
-                  description:
-                      'Choose your plan and start receiving bookings',
-                ),
                 _FeatureCard(
                   icon: Icons.calendar_month_rounded,
                   title: 'Manage Bookings',
@@ -340,6 +414,50 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSubscriptionCard() {
+    if (_isLoadingSubscription) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_subscription == null) {
+      return ElevatedButton(
+        onPressed: _navigateToSubscription,
+        child: const Text('Subscribe'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _subscription!.plan.name,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _subscription!.plan.description,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Expires on ${_subscription!.endDate}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: _navigateToSubscriptionManagement,
+          child: const Text('Manage Subscription'),
+        ),
+      ],
     );
   }
 }
