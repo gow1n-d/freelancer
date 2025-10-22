@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
-import '../../services/auth_service.dart';
+import '../../services/auth_provider.dart';
 import '../../utils/theme.dart';
 import '../../utils/validators.dart';
+import '../../utils/app_config.dart';
 import 'role_selection_screen.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../freelancer/freelancer_dashboard_screen.dart';
 
 /// Phone verification screen for OTP input
 class PhoneVerificationScreen extends StatefulWidget {
@@ -27,7 +27,6 @@ class PhoneVerificationScreen extends StatefulWidget {
 class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _otpController = TextEditingController();
-  final _authService = AuthService();
 
   bool _isLoading = false;
   bool _canResend = false;
@@ -80,43 +79,22 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
     });
 
     try {
-      // Verify OTP
-      final userCredential = await _authService.verifyOTP(
-        verificationId: _currentVerificationId,
-        otp: _otpController.text.trim(),
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Verify OTP using AuthProvider
+      await authProvider.verifyOTP(
+        _currentVerificationId,
+        _otpController.text.trim(),
       );
-
-      final user = userCredential.user;
-      if (user == null) {
-        throw Exception('Authentication failed');
-      }
-
-      // Check if user document exists
-      final userExists = await _authService.userDocumentExists(user.uid);
 
       if (!mounted) return;
 
-      if (userExists) {
-        // Existing user - fetch user data and navigate to appropriate dashboard
-        final userData = await _authService.getUserDocument(user.uid);
+      // Check if user document exists
+      final userExists = await authProvider.userExists();
 
-        if (!mounted) return;
+      if (!mounted) return;
 
-        if (userData == null) {
-          throw Exception('Failed to load user data');
-        }
-
-        // Navigate to dashboard based on role
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => userData.isFreelancer
-                ? const FreelancerDashboardScreen()
-                : const CustomerDashboardScreen(),
-          ),
-          (route) => false,
-        );
-      } else {
+      if (!userExists) {
         // New user - navigate to role selection
         Navigator.pushReplacement(
           context,
@@ -126,6 +104,10 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
             ),
           ),
         );
+      } else {
+        // Existing user - AuthProvider will handle navigation via AuthWrapper
+        // Just pop back to root and let AuthWrapper handle it
+        Navigator.popUntil(context, (route) => route.isFirst);
       }
     } catch (e) {
       setState(() {
@@ -152,35 +134,25 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
     });
 
     try {
-      await _authService.resendOTP(
-        phoneNumber: widget.phoneNumber,
-        codeSent: (verificationId) {
-          setState(() {
-            _currentVerificationId = verificationId;
-            _isLoading = false;
-          });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Resend OTP
+      final newVerificationId = await authProvider.signInWithPhone(widget.phoneNumber);
+      
+      setState(() {
+        _currentVerificationId = newVerificationId;
+        _isLoading = false;
+      });
 
-          _startResendTimer();
+      _startResendTimer();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP sent successfully'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        },
-        verificationFailed: (error) {
-          setState(() {
-            _isLoading = false;
-          });
+      if (!mounted) return;
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        },
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP sent successfully'),
+          backgroundColor: AppTheme.successColor,
+        ),
       );
     } catch (e) {
       setState(() {
@@ -240,6 +212,28 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
                         color: AppTheme.textSecondary,
                       ),
                 ),
+                
+                // Demo mode hint
+                if (AppConfig.enableMockMode && AppConfig.showDebugInfo) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'DEMO MODE: Use OTP ${AppConfig.mockOTP}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 40),
 
                 // OTP input
