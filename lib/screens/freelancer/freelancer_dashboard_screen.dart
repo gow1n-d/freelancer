@@ -26,7 +26,8 @@ class FreelancerDashboardScreen extends StatefulWidget {
 class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
   final _authService = AuthService();
   final _profileService = ProfileService();
-  final _subscriptionService = SubscriptionService();
+  
+  SubscriptionService? _subscriptionService;
   
   SubscriptionModel? _subscription;
   bool _isLoadingSubscription = true;
@@ -34,20 +35,29 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSubscriptionData();
+    // Initialize subscription service after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      _subscriptionService = SubscriptionService(
+        mockFirestore: AppConfig.enableMockMode ? authProvider.mockFirestore : null,
+      );
+      _loadSubscriptionData();
+    });
   }
 
   Future<void> _loadSubscriptionData() async {
+    if (_subscriptionService == null) return;
+    
     setState(() {
       _isLoadingSubscription = true;
     });
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userId = authProvider.firebaseUser?.uid;
+      final userId = authProvider.userId;
 
       if (userId != null) {
-        final subscription = await _subscriptionService.getSubscription(userId);
+        final subscription = await _subscriptionService!.getSubscription(userId);
         setState(() {
           _subscription = subscription;
           _isLoadingSubscription = false;
@@ -509,7 +519,7 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    _subscriptionService.formatStatus(_subscription!.status),
+                    _subscriptionService!.formatStatus(_subscription!.status),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: statusColor,
@@ -527,7 +537,7 @@ class _FreelancerDashboardScreenState extends State<FreelancerDashboardScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _subscriptionService.formatPlan(_subscription!.plan),
+                  _subscriptionService!.formatPlan(_subscription!.plan),
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.bold,
