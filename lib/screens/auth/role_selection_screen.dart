@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme.dart';
-import '../customer/customer_dashboard_screen.dart';
-import '../freelancer/freelancer_dashboard_screen.dart';
 
 /// Role selection screen for new users
 class RoleSelectionScreen extends StatefulWidget {
@@ -19,7 +18,6 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  final _authService = AuthService();
   String? _selectedRole;
   bool _isLoading = false;
 
@@ -40,30 +38,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     });
 
     try {
-      final user = _authService.currentUser;
-      if (user == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Create user document in Firestore
-      await _authService.createUserDocument(
-        uid: user.uid,
-        phoneNumber: widget.phoneNumber,
-        role: _selectedRole!,
-      );
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Create user document with selected role
+      await authProvider.createUser(_selectedRole!);
 
       if (!mounted) return;
 
-      // Navigate to appropriate dashboard
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => _selectedRole == AppConstants.roleFreelancer
-              ? const FreelancerDashboardScreen()
-              : const CustomerDashboardScreen(),
-        ),
-        (route) => false,
-      );
+      // Navigate back to root - AuthWrapper will handle dashboard navigation
+      Navigator.popUntil(context, (route) => route.isFirst);
     } catch (e) {
       setState(() {
         _isLoading = false;
