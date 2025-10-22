@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme.dart';
 import '../../utils/validators.dart';
+import '../../utils/app_config.dart';
 import 'phone_verification_screen.dart';
 
 /// Login screen for phone number input
@@ -17,7 +19,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _authService = AuthService();
 
   bool _isLoading = false;
 
@@ -42,41 +43,30 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authService.signInWithPhoneNumber(
-        phoneNumber: fullPhoneNumber,
-        codeSent: (verificationId) {
-          setState(() {
-            _isLoading = false;
-          });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Use AuthProvider's signInWithPhone method (works in both modes)
+      final verificationId = await authProvider.signInWithPhone(fullPhoneNumber);
 
-          // Navigate to OTP verification screen
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PhoneVerificationScreen(
-                phoneNumber: fullPhoneNumber,
-                verificationId: verificationId,
-              ),
-            ),
-          );
-        },
-        verificationFailed: (error) {
-          setState(() {
-            _isLoading = false;
-          });
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        },
-        codeAutoRetrievalTimeout: () {
-          // Timeout handled, verification ID already saved
-        },
+      // Navigate to OTP verification screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PhoneVerificationScreen(
+            phoneNumber: fullPhoneNumber,
+            verificationId: verificationId,
+          ),
+        ),
       );
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoading = false;
       });
@@ -130,6 +120,48 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppTheme.textSecondary,
                       ),
                 ),
+                
+                // Demo mode hint
+                if (AppConfig.enableMockMode && AppConfig.showDebugInfo) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'DEMO MODE',
+                                style: TextStyle(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Enter any 10-digit number\nUse OTP: ${AppConfig.mockOTP}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 60),
 
                 // Welcome text
