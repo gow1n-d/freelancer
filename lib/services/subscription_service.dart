@@ -1,15 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/subscription_model.dart';
 import '../utils/constants.dart';
+import '../utils/app_config.dart';
+import 'mock/mock_firestore_service.dart';
 
 /// Service for managing subscriptions
 class SubscriptionService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore? _firestore;
+  final MockFirestoreService? _mockFirestore;
 
-  /// Get subscription pricing from Firestore
+  SubscriptionService({MockFirestoreService? mockFirestore})
+      : _firestore = AppConfig.enableMockMode ? null : FirebaseFirestore.instance,
+        _mockFirestore = AppConfig.enableMockMode ? mockFirestore : null;
+
+  /// Get subscription pricing from Firestore (or mock)
   Future<SubscriptionPricing> getPricing() async {
     try {
-      final doc = await _firestore
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.getSubscriptionPricing();
+      }
+
+      final doc = await _firestore!
           .collection(AppConstants.appConfigCollection)
           .doc(AppConstants.subscriptionPricingDoc)
           .get();
@@ -26,10 +37,14 @@ class SubscriptionService {
     }
   }
 
-  /// Get trial settings from Firestore
+  /// Get trial settings from Firestore (or mock)
   Future<TrialSettings> getTrialSettings() async {
     try {
-      final doc = await _firestore
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.getTrialSettings();
+      }
+
+      final doc = await _firestore!
           .collection(AppConstants.appConfigCollection)
           .doc(AppConstants.trialSettingsDoc)
           .get();
@@ -49,7 +64,11 @@ class SubscriptionService {
   /// Get user's subscription
   Future<SubscriptionModel?> getSubscription(String userId) async {
     try {
-      final doc = await _firestore
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.getSubscription(userId);
+      }
+
+      final doc = await _firestore!
           .collection(AppConstants.subscriptionsCollection)
           .doc(userId)
           .get();
@@ -66,7 +85,12 @@ class SubscriptionService {
 
   /// Stream user's subscription
   Stream<SubscriptionModel?> streamSubscription(String userId) {
-    return _firestore
+    if (AppConfig.enableMockMode) {
+      // Mock mode doesn't support streams, return current value
+      return Stream.value(null);
+    }
+
+    return _firestore!
         .collection(AppConstants.subscriptionsCollection)
         .doc(userId)
         .snapshots()
@@ -81,6 +105,10 @@ class SubscriptionService {
   /// Start trial period for user
   Future<void> startTrial(String userId) async {
     try {
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.startTrial(userId);
+      }
+
       final trialSettings = await getTrialSettings();
 
       if (!trialSettings.enabled) {
@@ -101,13 +129,13 @@ class SubscriptionService {
         updatedAt: now,
       );
 
-      await _firestore
+      await _firestore!
           .collection(AppConstants.subscriptionsCollection)
           .doc(userId)
           .set(subscription.toFirestore());
 
       // Update user document
-      await _firestore.collection(AppConstants.usersCollection).doc(userId).update({
+      await _firestore!.collection(AppConstants.usersCollection).doc(userId).update({
         'subscriptionStatus': AppConstants.subscriptionTrial,
         'subscriptionStartDate': Timestamp.fromDate(now),
         'subscriptionEndDate': Timestamp.fromDate(endDate),
@@ -125,6 +153,14 @@ class SubscriptionService {
     required String paymentId,
   }) async {
     try {
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.activateSubscription(
+          userId: userId,
+          plan: plan,
+          paymentId: paymentId,
+        );
+      }
+
       final now = DateTime.now();
       DateTime endDate;
 
@@ -148,13 +184,13 @@ class SubscriptionService {
       );
 
       // Update subscription document
-      await _firestore
+      await _firestore!
           .collection(AppConstants.subscriptionsCollection)
           .doc(userId)
           .set(subscription.toFirestore());
 
       // Update user document
-      await _firestore.collection(AppConstants.usersCollection).doc(userId).update({
+      await _firestore!.collection(AppConstants.usersCollection).doc(userId).update({
         'subscriptionStatus': AppConstants.subscriptionActive,
         'subscriptionPlan': plan,
         'subscriptionStartDate': Timestamp.fromDate(now),
@@ -170,7 +206,11 @@ class SubscriptionService {
   /// Cancel subscription (marks for non-renewal at end of period)
   Future<void> cancelSubscription(String userId) async {
     try {
-      await _firestore
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.cancelSubscription(userId);
+      }
+
+      await _firestore!
           .collection(AppConstants.subscriptionsCollection)
           .doc(userId)
           .update({
@@ -179,7 +219,7 @@ class SubscriptionService {
         'updatedAt': Timestamp.now(),
       });
 
-      await _firestore.collection(AppConstants.usersCollection).doc(userId).update({
+      await _firestore!.collection(AppConstants.usersCollection).doc(userId).update({
         'autoRenewal': false,
         'updatedAt': Timestamp.now(),
       });
@@ -191,7 +231,11 @@ class SubscriptionService {
   /// Get payment history for user
   Future<List<PaymentModel>> getPaymentHistory(String userId) async {
     try {
-      final snapshot = await _firestore
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.getPaymentHistory(userId);
+      }
+
+      final snapshot = await _firestore!
           .collection(AppConstants.paymentsCollection)
           .where('userId', isEqualTo: userId)
           .orderBy('createdAt', descending: true)
@@ -209,6 +253,10 @@ class SubscriptionService {
   /// Check if user is eligible for trial
   Future<bool> isEligibleForTrial(String userId) async {
     try {
+      if (AppConfig.enableMockMode && _mockFirestore != null) {
+        return await _mockFirestore!.isEligibleForTrial(userId);
+      }
+
       // Check if user already has or had a subscription
       final subscription = await getSubscription(userId);
 
