@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default: Deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read: if request.auth != null &&
+        (resource.data.customerId == request.auth.uid ||
+         resource.data.freelancerId == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+        (resource.data.customerId == request.auth.uid ||
+         resource.data.freelancerId == request.auth.uid);
+    }
+
+    // Ratings collection
+    match /ratings/{ratingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.customerId == request.auth.uid;
+    }
+
+    // Subscriptions collection
+    match /subscriptions/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;  // Only via cloud functions
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow read: if request.auth != null;
+      allow write: if false;  // Only via cloud functions
+    }
+
+    // App config (public read)
+    match /appConfig/{document} {
+      allow read: if true;
+      allow write: if false;  // Only via admin/cloud functions
+    }
+  }
+}
