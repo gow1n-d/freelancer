@@ -7,15 +7,28 @@ import 'screens/customer/customer_dashboard_screen.dart';
 import 'screens/freelancer/freelancer_dashboard_screen.dart';
 import 'utils/constants.dart';
 import 'utils/theme.dart';
+import 'utils/app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  // Note: Uncomment after running `flutterfire configure`
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  // Initialize Firebase only if NOT in mock mode
+  if (!AppConfig.enableMockMode) {
+    try {
+      // Initialize Firebase
+      // Note: Run `flutterfire configure` to generate firebase_options.dart
+      // await Firebase.initializeApp(
+      //   options: DefaultFirebaseOptions.currentPlatform,
+      // );
+      
+      AppConfig.log('Firebase initialized successfully');
+    } catch (e) {
+      AppConfig.log('Firebase initialization failed: $e');
+      // Continue anyway if Firebase fails (will auto-enable mock mode)
+    }
+  } else {
+    AppConfig.log('Running in MOCK MODE - No Firebase required');
+  }
 
   runApp(const ServiceBookingApp());
 }
@@ -34,6 +47,17 @@ class ServiceBookingApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const AuthWrapper(),
+        // Show banner in debug mode
+        builder: (context, child) {
+          if (AppConfig.showDebugInfo && AppConfig.enableMockMode) {
+            return Banner(
+              message: 'DEMO MODE',
+              location: BannerLocation.topEnd,
+              child: child!,
+            );
+          }
+          return child!;
+        },
       ),
     );
   }
@@ -105,6 +129,30 @@ class SplashScreen extends StatelessWidget {
                     color: AppTheme.textSecondary,
                   ),
             ),
+            
+            // Show mode indicator in debug
+            if (AppConfig.showDebugInfo) ...[
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppConfig.enableMockMode 
+                      ? Colors.orange.withOpacity(0.2)
+                      : Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  AppConfig.modeDescription,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppConfig.enableMockMode 
+                            ? Colors.orange.shade800
+                            : Colors.green.shade800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+            ],
+            
             const SizedBox(height: 48),
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
